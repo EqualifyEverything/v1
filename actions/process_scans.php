@@ -1,9 +1,9 @@
 <?php
 // This file is designed to be run from command line
 // so we can do things like trigger via CRON.
-if(!defined('__ROOT__'))
+if (!defined('__ROOT__'))
     define('__ROOT__', dirname(dirname(__FILE__)));
-require_once(__ROOT__.'/init.php'); 
+require_once(__ROOT__ . '/init.php');
 
 try {
 
@@ -16,7 +16,7 @@ try {
         $property_id = isset($_CLI['property_id']) ? $_CLI['property_id'] : '';
 
         // Check if it's an individual scan is requested
-        if (!empty($job_id ) && !empty($property_id)) {
+        if (!empty($job_id) && !empty($property_id)) {
             if ($job_id !== false && $property_id !== false) {
                 $scans = [
                     [
@@ -32,25 +32,25 @@ try {
                 exit;
             }
 
-        // No arguements mean we process everything.
+            // No arguements mean we process everything.
         } else {
             process_scans();
         }
-    
-    // The script can also be run by posting to it or via custom URL variables
-    }elseif ( 
-        (isset($_POST['job_id']) && isset($_POST['property_id'])) || 
+
+        // The script can also be run by posting to it or via custom URL variables
+    } elseif (
+        (isset($_POST['job_id']) && isset($_POST['property_id'])) ||
         (isset($_GET['job_id']) && isset($_GET['property_id']))
     ) {
-        
+
         // Validate and sanitize inputs
-        if(isset($_POST['job_id']))
+        if (isset($_POST['job_id']))
             $job_id = filter_var($_POST['job_id'], FILTER_VALIDATE_INT);
-        if(isset($_POST['property_id']))
+        if (isset($_POST['property_id']))
             $property_id = filter_var($_POST['property_id'], FILTER_VALIDATE_INT);
-        if(isset($_GET['job_id']))
+        if (isset($_GET['job_id']))
             $job_id = $_GET['job_id'];
-        if(isset($_GET['property_id']))
+        if (isset($_GET['property_id']))
             $property_id = $_GET['property_id'];
 
         if ($job_id !== false && $property_id !== false) {
@@ -68,25 +68,22 @@ try {
             header("Location: ../index.php?view=scans");
             exit;
         }
-
     } else {
 
         // Not a POST request. Could be CLI or other
         // Existing code for processing scans
         process_scans();
-
     }
-
 } catch (Exception $e) {
 
     // Handle the exception
     echo $e->getMessage();
     exit;
-
 }
 
 // Helper Functions
-function process_scans($scans = null) {
+function process_scans($scans = null)
+{
     global $pdo;
 
     $max_scans = $_ENV['CONCURRENT_SCANS'] ?? 20; // Set maximum concurrent scans, default to 20 (what axe can do on xxs machine)
@@ -101,7 +98,7 @@ function process_scans($scans = null) {
         $prioritized_scans = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Just use prioritized scans if there's enough
-        if(count($prioritized_scans) >= $max_scans)
+        if (count($prioritized_scans) >= $max_scans)
             $scans = $prioritized_scans;
 
         // If not enough prioritized scans fetch the next scan
@@ -112,7 +109,6 @@ function process_scans($scans = null) {
             $other_scans = $stmt->fetchAll(PDO::FETCH_ASSOC);
             $scans = array_merge($prioritized_scans, $other_scans);
         }
-
     }
 
     // Handle if no scans to process.
@@ -124,12 +120,11 @@ function process_scans($scans = null) {
         $_SESSION['error'] = $error_message;
         header("Location: ../index.php?view=scans");
         exit;
-
     }
 
     // Run API on each scan
     $logged_messages = array();
-    foreach ($scans as $scan):
+    foreach ($scans as $scan) :
 
         // Define property id and job id.
         $property_id = $scan['queued_scan_property_id'];
@@ -139,13 +134,13 @@ function process_scans($scans = null) {
         update_processing_value($job_id, 1);
 
         // Perform the API GET request
-        $api_url =  $_ENV['SCAN_URL']. '/results/' . $job_id;
+        $api_url =  $_ENV['SCAN_URL'] . '/results/' . $job_id;
         $json = file_get_contents($api_url);
 
         // Handle scans that don't return JSON.
         if ($json === false) {
             $message = "Scan $job_id returns no JSON. Scan deleted.";
-            $logged_messages.=$message.'<br>';
+            $logged_messages .= $message . '<br>';
             update_log($message);
             delete_scan($job_id);
             continue;
@@ -156,9 +151,9 @@ function process_scans($scans = null) {
 
         // Handle incomplete scans.
         $statuses = array('delayed', 'active', 'waiting');
-        if(in_array($data['status'], $statuses)){
-            $message = 'Scan ' . $job_id . ' has "' . $data['status'] .'" status. Scan skipped.';
-            $logged_messages.=$message.'<br>';
+        if (in_array($data['status'], $statuses)) {
+            $message = 'Scan ' . $job_id . ' has "' . $data['status'] . '" status. Scan skipped.';
+            $logged_messages .= $message . '<br>';
             update_log($message);
             update_processing_value($job_id, NULL);
             continue;
@@ -166,9 +161,9 @@ function process_scans($scans = null) {
 
         // Handle problems scans.
         $statuses = array('failed', 'unknown');
-        if(in_array($data['status'], $statuses)){
-            $message = 'Scan ' . $job_id . ' has "' . $data['status'] .'" status. Scan skipped.';
-            $logged_messages.=$message.'<br>';
+        if (in_array($data['status'], $statuses)) {
+            $message = 'Scan ' . $job_id . ' has "' . $data['status'] . '" status. Scan skipped.';
+            $logged_messages .= $message . '<br>';
             update_log($message);
             delete_scan($job_id);
             continue;
@@ -188,7 +183,7 @@ function process_scans($scans = null) {
                 // Handle incorrectly formatted violations
                 if (!isset($violation['id'], $violation['tags'], $violation['nodes'])) {
                     $message = "Scan $job_id returns violations in invalid format. Scan deleted.";
-                    $logged_messages.=$message.'<br>';
+                    $logged_messages .= $message . '<br>';
                     update_log($message);
                     delete_scan($job_id);
                     continue;
@@ -202,9 +197,9 @@ function process_scans($scans = null) {
                     // Handle incorrectly formatted nodes.
                     if (!isset($node['html'])) {
                         $message = "Scan $job_id returns node in invalid format. Scan deleted.";
-                        $logged_messages.=$message.'<br>';
+                        $logged_messages .= $message . '<br>';
                         update_log($message);
-    
+
                         delete_scan($job_id);
                         continue;
                     }
@@ -215,9 +210,9 @@ function process_scans($scans = null) {
                                 // Handle incorrectly formatted messages.
                                 if (!isset($item['message'])) {
                                     $message = "Scan $job_id returns invalid '$key' format in node. Scan deleted.";
-                                    $logged_messages.=$message.'<br>';
+                                    $logged_messages .= $message . '<br>';
                                     update_log($message);
-                
+
                                     delete_scan($job_id);
                                     continue;
                                 }
@@ -236,9 +231,9 @@ function process_scans($scans = null) {
                     }
                 }
             }
-        
-        // Handle unformatted results.
-        }else{
+
+            // Handle unformatted results.
+        } else {
             $message = "Scan $job_id returns no violations. Scan deleted.";
             $logged_messages[] = $message;
             update_log($message);
@@ -276,8 +271,10 @@ function process_scans($scans = null) {
             foreach ($group as $occurrence) {
                 $found = false;
                 foreach ($existing_occurrences as $existing_occurrence) {
-                    if ($existing_occurrence['occurrence_code_snippet'] == $occurrence['occurrence_code_snippet'] &&
-                        $existing_occurrence['occurrence_message_id'] == $occurrence['occurrence_message_id']) {
+                    if (
+                        $existing_occurrence['occurrence_code_snippet'] == $occurrence['occurrence_code_snippet'] &&
+                        $existing_occurrence['occurrence_message_id'] == $occurrence['occurrence_message_id']
+                    ) {
                         $found = true;
                         $existing_ids_in_group[] = $existing_occurrence['occurrence_id'];
                         if ($existing_occurrence['occurrence_status'] == 'equalified') {
@@ -298,7 +295,6 @@ function process_scans($scans = null) {
                     $equalified_occurrences[] = $existing_occurrence['occurrence_id'];
                 }
             }
-
         }
 
         // Save new occurrences as 'activated'
@@ -320,7 +316,6 @@ function process_scans($scans = null) {
                 'occurrence_id' => $pdo->lastInsertId(),
                 'occurrence_tag_ids' => $occurrence['tag_ids']
             );
-
         }
 
         // Insert tags relationships into db
@@ -363,25 +358,29 @@ function process_scans($scans = null) {
     endforeach;
 
     // Redirect with logged messages
-    if(!empty($logged_messages)){
-        $success_message = 'Success! Returned the following results: <ul>';
-        foreach ($logged_messages as $message){
-            $success_message.= "<li>$message</li>";
-        }
-        $success_message.= "</ul>";
+    if (!empty($logged_messages) && is_array($logged_messages)) {
+        $success_count = count($logged_messages);
+        $success_message = 'Success! Returned ' . $success_count . ' results.';
+        // $success_message = 'Success! Returned the following results: <ul>';
+        // foreach ($logged_messages as $message){
+        //     $success_message.= "<li>$message</li>";
+        // }
+        // $success_message.= "</ul>";
         $_SESSION['success'] = $success_message;
-        header("Location: ../index.php?view=scans");    
+        header("Location: ../index.php?view=scans");
     }
 }
 
-function update_processing_value($job_id, $new_value){
+function update_processing_value($job_id, $new_value)
+{
     global $pdo;
 
     $stmt = $pdo->prepare("UPDATE queued_scans SET queued_scan_processing = ? WHERE queued_scan_job_id = ?");
     $stmt->execute([$new_value, $job_id]);
 }
 
-function get_message_id($title, $message_link) {
+function get_message_id($title, $message_link)
+{
     global $pdo;
 
     // Check if the message exists
@@ -401,7 +400,8 @@ function get_message_id($title, $message_link) {
     }
 }
 
-function get_page_id($url, $property_id) {
+function get_page_id($url, $property_id)
+{
     global $pdo;
 
     // Check if the page exists
@@ -421,7 +421,8 @@ function get_page_id($url, $property_id) {
     }
 }
 
-function get_tag_ids($tags) {
+function get_tag_ids($tags)
+{
     global $pdo;
     $tagIds = [];
 
@@ -448,7 +449,8 @@ function get_tag_ids($tags) {
     return $tagIds; // Return concatenated tag IDs
 }
 
-function add_tag_relationships($new_occurrence_tag_relationships) {
+function add_tag_relationships($new_occurrence_tag_relationships)
+{
     global $pdo;
 
     // Start transaction
@@ -470,7 +472,7 @@ function add_tag_relationships($new_occurrence_tag_relationships) {
             }
         }
 
-        if(!empty($insertValues)) {
+        if (!empty($insertValues)) {
             $query .= implode(', ', $insertValues);
             $statement = $pdo->prepare($query);
             $statement->execute($params);
@@ -485,17 +487,32 @@ function add_tag_relationships($new_occurrence_tag_relationships) {
     }
 }
 
-function delete_scan($job_id){
+function delete_scan($job_id)
+{
 
     global $pdo;
 
     $query = "DELETE FROM queued_scans WHERE queued_scan_job_id = :queued_scan_job_id";
     $statement = $pdo->prepare($query);
     $statement->execute([':queued_scan_job_id' => $job_id]);
-
 }
 
-function update_log($message){
-    echo(date('Y-m-d H:i:s') . ": $message\n");
+function update_log($message)
+{
+    echo (date('Y-m-d H:i:s') . ": $message\n");
 }
 ?>
+ArrayScan 192936 has "active" status. Scan skipped.
+Scan 192937 has "active" status. Scan skipped.
+Scan 192938 has "waiting" status. Scan skipped.
+Scan 192939 has "waiting" status. Scan skipped.
+Scan 192940 has "waiting" status. Scan skipped.
+Scan 192941 has "waiting" status. Scan skipped.
+Scan 192942 has "waiting" status. Scan skipped.
+Scan 192943 has "waiting" status. Scan skipped.
+Scan 192944 has "waiting" status. Scan skipped.
+Scan 192945 has "waiting" status. Scan skipped.
+Scan 192946 has "waiting" status. Scan skipped.
+Scan 192947 has "waiting" status. Scan skipped.
+Scan 192948 has "waiting" status. Scan skipped.
+"
