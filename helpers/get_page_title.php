@@ -27,6 +27,15 @@ function get_page_title()
             case 'account':
                 $title = "My Account | Equalify";
                 break;
+            case 'message':
+                $title = "Message | Equalify";
+                break;
+            case 'page':
+                $title = "Page | Equalify";
+                break;
+            case 'tag_detail':
+                $title = "Tag Detail | Equalify";
+                break;
                 // Add other cases as needed
         }
     }
